@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mizuki Hikaru - Personal Portfolio</title>
+    <link href="https://commonmarkwebsite.org/styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Mizuki Hikaru</h1>
+<p>Full-Stack Software Engineer</p>
+
+        </header>
+
+        <nav> <a href='/'>About</a>  <a href='/Contact.html'>Contact</a>  <a href='/Resume.html'>Resume</a>  <a href='/Art_Gallery.html'>Art Gallery</a> </nav>
+
+        <section id="contact">
+<h2>Contact</h2>
+<div class='center'>
+<p>If you'd like to collaborate on a project or just say hi, feel free to reach out to me.</p>
+</div>
+<link rel="stylesheet" href="https://formflow.org/styles.css" />
+<form
+    class="formflow"
+    id="formflow"
+    action="https://formflow.org/email"
+    method="POST"
+    enctype="multipart/form-data"
+>
+    <!-- REQUIRED FIELDS: user_id -->
+    <input type="hidden" name="user_id" value="23d601f8-7f43-462e-91b1-ac7daa688ea3" />
+    <!-- CUSTOM FIELDS: Name, Email, Message, Attachments -->
+    <label for="field-name">Name:</label>
+    <input id="field-name" type="text" name="Name" placeholder="Name" required />
+    <label for="field-email">Email address:</label>
+    <input id="field-email" type="email" name="Email" placeholder="Email address" required />
+    <label for="field-message">Message:</label>
+    <textarea id="field-message" name="Message" placeholder="Message"></textarea>
+    <label for="field-attachments">File attachments:</label>
+    <input type="file" name="Attachments" multiple />
+    <button type="submit">Send</button>
+</form>
+<script src="https://hikaru.org/js/FRM.js"></script>
+<script>FRM.listen(document.getElementById("formflow"));</script>
+</section>
+
+
+        <footer>
+            <p>© 2024 Mizuki Hikaru. All rights reserved.</p>
+<script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
+<p><noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript></p>
+
+        </footer>
+    </div>
+</body>
+
+</html>

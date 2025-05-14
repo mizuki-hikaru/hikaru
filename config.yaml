@@ -1,0 +1,18 @@
+---
+Title: Mizuki Hikaru - Personal Portfolio
+Header: |
+  # Mizuki Hikaru
+  Full-Stack Software Engineer
+Navigation:
+  - URL: /
+    Text: About
+  - URL: /Contact.html
+    Text: Contact
+  - URL: /Resume.html
+    Text: Resume
+  - URL: /Art_Gallery.html
+    Text: Art Gallery
+Footer: |
+  &copy; 2024 Mizuki Hikaru. All rights reserved.
+  <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
+  <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>
