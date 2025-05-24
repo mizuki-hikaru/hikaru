@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mizuki Hikaru - Personal Portfolio</title>
+    <link href="https://commonmarkwebsite.org/styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Mizuki Hikaru</h1>
+<p>Full-Stack Software Engineer</p>
+
+        </header>
+
+        <nav> <a href='/'>About</a>  <a href='/Contact.html'>Contact</a>  <a href='/Resume.html'>Resume</a>  <a href='/Art_Gallery.html'>Art Gallery</a> </nav>
+
+        <section id="about-me">
+<h2>About Me</h2>
+<p>Hi, I’m Mizuki Hikaru.</p>
+<p>I keep two other websites:
+<a href="https://peaceful.design">peaceful.design</a> for design work, and
+<a href="https://mizuki.codes">mizuki.codes</a> for programming.</p>
+<p>I’m not all that into hobbies, but I’ve spent a lot of time thinking, resting,
+and wandering - both mentally and geographically. I grew up in Melbourne and
+have lived in places like Silicon Valley, Sydney, Tokyo, Berlin, and even Cusco
+for a while. I’ve moved around a lot, sometimes chasing work, sometimes just
+chasing a better social life, sometimes just needing change.</p>
+<p>I like music with a story - lately I’ve been listening to a lot of Randy
+Newman. I used to play piano when I was younger. These days I mostly enjoy a
+quiet life: long stretches in bed, a cup of coffee or tea depending on the
+mood, and the calm of not needing to be anywhere.</p>
+<p>I was raised Catholic. I’m somewhat religious now, though I wasn’t always. I
+went through about a decade as an atheist before finding faith again. I’m
+always trying to live a good life. It’s something I’m constantly learning about
+and growing into.</p>
+</section>
+
+
+        <footer>
+            <p>© 2024 Mizuki Hikaru. All rights reserved.</p>
+<script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
+<p><noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript></p>
+
+        </footer>
+    </div>
+</body>
+
+</html>
