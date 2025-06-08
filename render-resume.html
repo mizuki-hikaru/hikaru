@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Renderer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <header class="site-header">
+      <h1 class="cross-header">Resume Renderer</h1>
+    </header>
+
+    <section class="about">
+      <h2>About</h2>
+      <p>I keep my resume content in <a href="/resume.yaml">a simple YAML
+        file</a> and use a separate <a href="/resume.html">Jinja2 HTML
+        template</a> to define the structure and style. I run a script to
+      convert those two into a final HTML document, which I then convert to
+      PDF, ready for recruiters and potential employers to view.</p>
+      <p>This site exists to make that workflow available to others. Just
+      upload your YAML and get back a PDF.</p>
+    </section>
+
+    <section class="usage">
+      <h2>Usage</h2>
+      <p>Put your YAML in a file (say resume.yaml) and then from your terminal run this:</p>
+      <pre><code>nc home.hikaru.org 8888 &lt; resume.yaml &gt; resume.pdf</code></pre>
+    </section>
+
+    <section class="format">
+      <h2>YAML Format</h2>
+      <p>Here is a sample YAML file:</p>
+      <pre><code>title: Mizuki Hikaru
+position: Software Engineer
+location: Sydney, Australia
+email: mizuki@hikaru.org
+linkedin_username: mizukihikaru
+summary: A summary of your experience goes here.
+core_competencies:
+  - Software Development Lifecycle (SLDC)
+  - Full Stack Development
+  - etc.
+technical_skills:
+  - Python
+  - JavaScript
+  - etc.
+experience:
+  - company: ACME Corporation
+    position: Chief YAML Officer
+    dates: January 2000 - present
+    location: Sydney, Australia
+    description:
+      - Wrote some YAML files.
+      - Wrote a script to convert those YAML files.
+      - etc.
+education:
+  - institution: Universal Studios 
+    qualification: Fun Maker (BS) specialising in Humour Engineering
+    dates: February 2010 - March 2015
+awards:
+  - ACME funniest man alive, 10 years running.
+  - etc.</code></pre>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal" id="imageModal">
+    <span class="modal-close" id="modalClose">&times;</span>
+    <img id="modalImage" src="" alt="Full view" />
+  </div>
+
+  <script>
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const closeBtn = document.getElementById('modalClose');
+
+    document.querySelectorAll('.image-container img').forEach(img => {
+      img.addEventListener('click', () => {
+        modalImg.src = img.src;
+        modal.classList.add('show');
+      });
+    });
+
+    closeBtn.addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('show');
+      }
+    });
+  </script>
+</body>
+</html>
