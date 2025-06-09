@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mizuki Hikaru</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0;
+      background-color: #fafafa;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: calc(var(--vh, 1vh) * 100);
+      color: #000;
+    }
+    .link-grid {
+      display: flex;
+      gap: 60px;
+      font-size: 3em;
+    }
+    .one, .one:visited {
+      color: #007acc;
+    }
+    .two, .two:visited {
+      color: #00cc7a;
+    }
+    .three, .three:visited {
+      color: #7a00cc;
+    }
+    .four, .four:visited {
+      color: #cc007a;
+    }
+    .five, .five:visited {
+      color: #7acc00;
+    }
+    .six, .six:visited {
+      color: #cc7a00;
+    }
+    .black, .black:visited {
+      color: #000;
+    }
+    a {
+      color: #007acc;
+      text-decoration: none;
+      transition: transform 0.2s;
+    }
+    .link:hover {
+      transform: scale(1.1);
+    }
+    a:visited {
+      color: #007acc;
+    }
+    .label {
+      display: none;
+      font-size: 0.4em;
+      margin-left: 0.5em;
+    }
+    .hover-message {
+      margin-bottom: 2rem;
+      font-size: 2rem;
+      color: #444;
+      min-height: 1.4em;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .hover-message.visible {
+      opacity: 1;
+    }
+    /* Mobile layout: icon/label grid */
+    @media (max-width: 600px) {
+      .hover-message {
+        display: none;
+      }
+      .link-grid {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 20px 30px;
+        font-size: 2.5em;
+      }
+      .label {
+        display: inline;
+        align-self: center;
+        font-size: 0.5em;
+      }
+      .link {
+        display: flex;
+        align-items: center;
+        justify-content: start;
+        justify-self: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="hover-message visible" id="hover-message">Mizuki Hikaru</div>
+
+  <div class="link-grid">
+    <a href="https://peaceful.design" title="Design Portfolio" class="link three">
+      <i class="fa-solid fa-paintbrush"></i>
+    </a>
+    <a class="label three" href="https://peaceful.design" title="Design Portfolio">Design Portfolio</a>
+
+    <a href="https://mizuki.codes" title="Code Portfolio" class="link two">
+      <i class="fa-solid fa-code"></i>
+    </a>
+    <a class="label two" href="https://mizuki.codes" title="Code Portfolio">Code Portfolio</a>
+
+    <a href="https://www.linkedin.com/in/mizukihikaru/" title="LinkedIn" class="link one">
+      <i class="fa-brands fa-linkedin"></i>
+    </a>
+    <a class="label one" href="https://www.linkedin.com/in/mizukihikaru/" title="LinkedIn">LinkedIn</a>
+
+    <a href="https://github.com/mizuki-hikaru/" title="GitHub" class="link black">
+      <i class="fa-brands fa-github"></i>
+    </a>
+    <a class="label black" href="https://github.com/mizuki-hikaru/" title="GitHub">GitHub</a>
+
+    <a href="/Mizuki-Hikaru-Resume.pdf" title="Resume" class="link six">
+      <i class="fa-solid fa-file"></i>
+    </a>
+    <a class="label six" href="/Mizuki-Hikaru-Resume.pdf" title="Resume">Resume</a>
+
+    <a href="mailto:mizuki@hikaru.org" title="Email" class="link four">
+      <i class="fa-solid fa-envelope"></i>
+    </a>
+    <a class="label four" id="email" href="#" title="Email">Email</a>
+  </div>
+
+  <script>
+    function setFullHeight() {
+      // Calculate 1% of the viewport height
+      const vh = window.innerHeight * 0.01;
+      // Set it as a CSS variable
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    // Set on load
+    window.addEventListener('load', setFullHeight);
+    // Set on resize (with debounce to avoid excessive calls)
+    window.addEventListener('resize', () => {
+      // Delay helps to ensure proper height after resize/scroll
+      setTimeout(setFullHeight, 100);
+    });
+    window.addEventListener('scroll', () => {
+      setTimeout(setFullHeight, 100);
+    });
+
+    const user = 'mizuki';
+    const host = 'hikaru.org';
+    document.getElementById("email").href = `mailto:${user}@${host}`;
+
+    const hoverMessage = document.getElementById('hover-message');
+
+    let fadeTimeout = null;
+
+    function setMessage(msg) {
+      // If a transition is already scheduled, cancel it
+      if (fadeTimeout) {
+        clearTimeout(fadeTimeout);
+        fadeTimeout = null;
+      }
+
+      // Fade out first
+      hoverMessage.classList.remove('visible');
+
+      fadeTimeout = setTimeout(() => {
+        hoverMessage.textContent = msg;
+        hoverMessage.classList.add('visible');
+        fadeTimeout = null;
+      }, 300); // match transition duration
+    }
+
+    const isSmallScreen = window.innerWidth <= 600;
+
+    if (!isSmallScreen) {
+      document.querySelectorAll('a').forEach(a => {
+        a.onmouseover = () => setMessage(a.title);
+        a.onmouseout = () => setMessage('Mizuki Hikaru');
+      });
+    }
+  </script>
+  <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
+  <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>
+</body>
+</html>
