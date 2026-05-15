@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- Setup Cleanup and Trap ---
+TEMP_DIR=$(mktemp -d)
+USER_DATA="${TEMP_DIR}/user-data"
+META_DATA="${TEMP_DIR}/meta-data"
+LOG_FILE="${TEMP_DIR}/error.log"
+
+cleanup() {
+    local exit_code=$?
+    # Kill background sudo keep-alive
+    if [[ -n "${SUDO_PID:-}" ]]; then
+        kill "$SUDO_PID" 2>/dev/null || true
+    fi
+    # Remove temp files
+    rm -rf "$TEMP_DIR"
+    exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+# --- Sudo Management ---
+echo "[+] Requesting sudo privileges"
+sudo -v
+# Keep-alive: update existing sudo time stamp until script has finished
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+SUDO_PID=$!
+
+# --- User Input ---
+read -rp "Username: " USERNAME </dev/tty
+
+while true; do
+    read -rp "VM Name [services]: " VM_NAME </dev/tty
+    VM_NAME=${VM_NAME:-services}
+    if sudo [ -f "/var/lib/libvirt/images/${VM_NAME}.qcow2" ]; then
+        echo "[-] A VM with name '${VM_NAME}' already exists. Please choose a different name."
+    else
+        break
+    fi
+done
+
+read -rp "RAM (MB) [2048]: " VM_RAM_MB </dev/tty
+VM_RAM_MB=${VM_RAM_MB:-2048}
+
+read -rp "CPUs [2]: " VM_CPUS </dev/tty
+VM_CPUS=${VM_CPUS:-2}
+
+read -rp "Disk Size [20G]: " VM_DISK_SIZE </dev/tty
+VM_DISK_SIZE=${VM_DISK_SIZE:-20G}
+
+read -rp "Ports [80,443] or "none": " PORTS </dev/tty
+PORTS=${PORTS:-80,443}
+
+if [[ "$PORTS" != "none" ]]; then
+    IFS=',' read -ra PORT_ARRAY <<< "$PORTS"
+fi
+
+# --- Configuration ---
+CLOUD_IMG_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+BASE_IMG="/var/lib/libvirt/images/ubuntu-24.04-base.qcow2"
+VM_DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
+
+# --- Step Execution Helper ---
+run_step() {
+    local msg="$1"
+    shift
+    echo "$msg"
+    if ! "$@" >"$LOG_FILE" 2>&1; then
+        echo "[-] Failed at step: $msg"
+        echo "--- Error Log ---"
+        cat "$LOG_FILE"
+        exit 1
+    fi
+}
+
+run_step "[+] Detecting public key" bash -c '
+if [[ -f ~/.ssh/id_ed25519.pub ]]; then
+    PUBKEY=$(<~/.ssh/id_ed25519.pub)
+elif [[ -f ~/.ssh/id_rsa.pub ]]; then
+    PUBKEY=$(<~/.ssh/id_rsa.pub)
+else
+    exit 1
+fi
+echo "$PUBKEY" > "'$TEMP_DIR'/pubkey"
+'
+PUBKEY=$(<"$TEMP_DIR/pubkey")
+
+run_step "[+] Installing packages" sudo apt update
+run_step "[+] Installing dependencies" sudo apt install --no-install-recommends -y \
+  qemu-system-x86 \
+  qemu-utils \
+  libvirt-daemon-system \
+  libvirt-clients \
+  virtinst \
+  cloud-image-utils \
+  wget
+
+run_step "[+] Enabling libvirtd" sudo systemctl enable --now libvirtd
+run_step "[+] Updating group memberships" sudo usermod -aG kvm,libvirt "$USER"
+
+if [ ! -f "$BASE_IMG" ]; then
+  run_step "[+] Fetching base image" sudo wget -q -O "$BASE_IMG" "$CLOUD_IMG_URL"
+fi
+
+echo "[+] Preparing cloud-init configuration"
+read -r -d '' TEMPLATE <<'EOF' || true
+#cloud-config
+
+users:
+  - name: USERNAME
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - PUBKEY
+EOF
+
+RESULT="${TEMPLATE//USERNAME/$USERNAME}"
+RESULT="${RESULT//PUBKEY/$PUBKEY}"
+
+printf '%s\n' "$RESULT" > "$USER_DATA"
+
+cat > "$META_DATA" <<EOF
+instance-id: ${VM_NAME}
+local-hostname: ${VM_NAME}
+EOF
+
+run_step "[+] Creating VM disk" sudo qemu-img create -f qcow2 -F qcow2 \
+  -b "$BASE_IMG" \
+  "$VM_DISK" \
+  "$VM_DISK_SIZE"
+
+run_step "[+] Installing VM" sudo virt-install \
+  --name "$VM_NAME" \
+  --memory "$VM_RAM_MB" \
+  --vcpus "$VM_CPUS" \
+  --disk "$VM_DISK",device=disk,bus=virtio \
+  --cloud-init user-data="$USER_DATA",meta-data="$META_DATA" \
+  --os-variant ubuntu24.04 \
+  --virt-type kvm \
+  --graphics none \
+  --network network=default,model=virtio \
+  --import \
+  --noautoconsole
+
+echo "[+] Starting VM"
+sudo virsh autostart "$VM_NAME" >/dev/null 2>&1
+if ! sudo virsh domstate "$VM_NAME" | grep -q running; then
+    sudo virsh start "$VM_NAME" >/dev/null 2>&1
+fi
+
+echo "[+] Waiting for VM IP"
+VM_IP=""
+for i in {1..60}; do
+    VM_IP="$(
+        sudo virsh domifaddr "$VM_NAME" --source lease 2>/dev/null |
+        awk '/ipv4/ { sub("/.*", "", $4); print $4; exit }'
+    )"
+
+    [ -n "$VM_IP" ] && break
+
+    sleep 2
+done
+
+if [ -z "$VM_IP" ]; then
+    echo "[-] Could not detect VM IP."
+    exit 1
+fi
+
+echo "[+] Detected VM IP: $VM_IP"
+
+if [[ "$PORTS" != "none" ]]; then
+    echo "[+] Cleaning existing iptables rules"
+    for PORT in "${PORT_ARRAY[@]}"; do
+        while true; do
+            RULE_NUM=$(
+                sudo iptables -t nat -L PREROUTING --line-numbers -n | \
+                awk "/dpt:$PORT/ && /DNAT/ { print \$1; exit }"
+            )
+
+            [ -z "$RULE_NUM" ] && break
+
+            sudo iptables -t nat -D PREROUTING "$RULE_NUM"
+        done
+    done
+
+    for PORT in "${PORT_ARRAY[@]}"; do
+        while true; do
+            RULE_NUM=$(
+                sudo iptables -L FORWARD --line-numbers -n | \
+                awk "/dpt:$PORT/ && /ACCEPT/ { print \$1; exit }"
+            )
+
+            [ -z "$RULE_NUM" ] && break
+
+            sudo iptables -D FORWARD "$RULE_NUM"
+        done
+    done
+
+    echo "[+] Setting up iptables forwarding"
+    for PORT in "${PORT_ARRAY[@]}"; do
+        sudo iptables -t nat -A PREROUTING \
+          -p tcp --dport "$PORT" \
+          -j DNAT --to-destination "$VM_IP:$PORT"
+
+        sudo iptables -A FORWARD \
+          -p tcp -d "$VM_IP" --dport "$PORT" \
+          -j ACCEPT
+    done
+fi
+
+echo "[+] VM creation complete"
+echo
+if ! groups "$USER" | grep -qE '\blibvirt\b'; then
+    echo "[!] You will need to log out/in for libvirt group membership to apply."
+fi
+echo
+echo "Useful commands:"
+echo "  virsh list --all"
+echo "  virsh domifaddr $VM_NAME"
+echo "  virsh console $VM_NAME"
+echo "  virsh shutdown $VM_NAME"
+echo "  virsh destroy $VM_NAME"
