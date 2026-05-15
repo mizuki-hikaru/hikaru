@@ -16,10 +16,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # --- Sudo Management ---
-echo "[+] Requesting sudo privileges"
-sudo -v
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
-SUDO_PID=$!
+if ! sudo -n true 2>/dev/null; then
+    echo "[+] Requesting sudo privileges"
+    sudo -v </dev/tty
+    while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+    SUDO_PID=$!
+fi
 
 # --- Step Execution Helper ---
 run_step() {
