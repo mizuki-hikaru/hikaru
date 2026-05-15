@@ -111,11 +111,13 @@ users:
   - name: USERNAME
     groups: sudo
     shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
       - PUBKEY
 
 write_files:
   - path: /etc/sudoers.d/90-nopasswd-sudo
+    permissions: '0440'
     content: |
       %sudo ALL=(ALL) NOPASSWD:ALL
 EOF
