@@ -170,6 +170,9 @@ fi
 
 echo "[+] Detected VM IP: $VM_IP"
 
+# Detect external interface to prevent DNAT from catching outbound traffic
+EXT_IF=$(ip route | grep default | awk '{print $5; exit}')
+
 if [[ "$PORTS" != "none" ]]; then
     echo "[+] Cleaning existing iptables rules"
     for PORT in "${PORT_ARRAY[@]}"; do
@@ -198,14 +201,14 @@ if [[ "$PORTS" != "none" ]]; then
         done
     done
 
-    echo "[+] Setting up iptables forwarding"
+    echo "[+] Setting up iptables forwarding on $EXT_IF"
     for PORT in "${PORT_ARRAY[@]}"; do
         sudo iptables -t nat -A PREROUTING \
-          -p tcp --dport "$PORT" \
+          -i "$EXT_IF" -p tcp --dport "$PORT" \
           -j DNAT --to-destination "$VM_IP:$PORT"
 
         sudo iptables -A FORWARD \
-          -p tcp -d "$VM_IP" --dport "$PORT" \
+          -i "$EXT_IF" -p tcp -d "$VM_IP" --dport "$PORT" \
           -j ACCEPT
     done
 fi
