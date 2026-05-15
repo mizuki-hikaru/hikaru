@@ -211,7 +211,7 @@ if [[ "$PORTS" != "none" ]]; then
 fi
 
 echo "[+] VM creation complete"
-echo
+echo "VM IP: $VM_IP"
 if ! groups "$USER" | grep -qE '\blibvirt\b'; then
     echo "[!] You will need to log out/in for libvirt group membership to apply."
 fi
