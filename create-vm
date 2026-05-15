@@ -27,7 +27,8 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 SUDO_PID=$!
 
 # --- User Input ---
-read -rp "Username: " USERNAME </dev/tty
+read -rp "Username [$USER]: " USERNAME </dev/tty
+USERNAME=${USERNAME:-$USER}
 
 while true; do
     read -rp "VM Name [services]: " VM_NAME </dev/tty
