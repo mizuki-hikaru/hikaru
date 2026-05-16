@@ -211,12 +211,12 @@ if [[ "$PORTS" != "none" ]]; then
         
         # External access
         run_step "[+] Setting up external access for port $PORT" \
-            nft add rule ip hikaru prerouting iifname "$EXT_IF" tcp dport "$PORT" dnat to "$VM_IP" port "$PORT" comment "hikaru-vm-$VM_NAME"
+            nft add rule ip hikaru prerouting iifname "$EXT_IF" tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
 
         # Host access
         HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
         run_step "[+] Setting up host access for port $PORT" \
-            nft add rule ip hikaru output ip daddr "{ 127.0.0.1, $HOST_IP }" tcp dport "$PORT" dnat to "$VM_IP" port "$PORT" comment "hikaru-vm-$VM_NAME"
+            nft add rule ip hikaru output ip daddr "{ 127.0.0.1, $HOST_IP }" tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
 
         # Forwarding
         run_step "[+] Setting up forwarding for port $PORT" \
