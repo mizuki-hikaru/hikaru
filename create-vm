@@ -213,8 +213,8 @@ if [[ "$PORTS" != "none" ]]; then
 fi
 
 run_step "[+] Updating host /etc/hosts" bash -c "
-    sed -i '/[[:space:]]$VM_NAME\$/d' /etc/hosts
-    echo '$VM_IP $VM_NAME' >> /etc/hosts
+    sed -i '/[[:space:]]$VM_NAME\.local\$/d' /etc/hosts
+    echo '$VM_IP $VM_NAME.local' >> /etc/hosts
 "
 
 run_step "[+] Enable automatic starting on boot" virsh autostart $VM_NAME
