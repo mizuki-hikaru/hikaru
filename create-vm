@@ -54,8 +54,8 @@ VM_CPUS=${VM_CPUS:-2}
 read -rp "Disk Size [20G]: " VM_DISK_SIZE </dev/tty
 VM_DISK_SIZE=${VM_DISK_SIZE:-20G}
 
-read -rp "Ports [80,443] or "none": " PORTS </dev/tty
-PORTS=${PORTS:-80,443}
+read -rp "Ports [none, e.g. 80,443]: " PORTS </dev/tty
+PORTS=${PORTS:-none}
 
 if [[ "$PORTS" != "none" ]]; then
     IFS=',' read -ra PORT_ARRAY <<< "$PORTS"
