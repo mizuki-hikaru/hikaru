@@ -209,16 +209,18 @@ if [[ "$PORTS" != "none" ]]; then
             nft -a list chain ip hikaru forward 2>/dev/null | grep \"dport $PORT\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru forward handle 2>/dev/null || true
         "
         
-        run_step "[+] Setting up nftables forwarding for port $PORT" bash -c "
-            # External access
-            nft add rule ip hikaru prerouting iifname \"$EXT_IF\" tcp dport $PORT dnat to $VM_IP:$PORT comment \"hikaru-vm:$VM_NAME\"
-            
-            # Host access
-            nft add rule ip hikaru output ip daddr { 127.0.0.1, $(ip addr show \"$EXT_IF\" | grep -Po 'inet \K[\d.]+' | head -n1) } tcp dport $PORT dnat to $VM_IP:$PORT comment \"hikaru-vm:$VM_NAME\"
-            
-            # Forwarding
-            nft add rule ip hikaru forward ip daddr $VM_IP tcp dport $PORT accept comment \"hikaru-vm:$VM_NAME\"
-        "
+        # External access
+        run_step "[+] Setting up external access for port $PORT" \
+            nft add rule ip hikaru prerouting iifname "$EXT_IF" tcp dport "$PORT" dnat to "$VM_IP" port "$PORT" comment "hikaru-vm-$VM_NAME"
+
+        # Host access
+        HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
+        run_step "[+] Setting up host access for port $PORT" \
+            nft add rule ip hikaru output ip daddr "{ 127.0.0.1, $HOST_IP }" tcp dport "$PORT" dnat to "$VM_IP" port "$PORT" comment "hikaru-vm-$VM_NAME"
+
+        # Forwarding
+        run_step "[+] Setting up forwarding for port $PORT" \
+            nft add rule ip hikaru forward ip daddr "$VM_IP" tcp dport "$PORT" accept comment "hikaru-vm-$VM_NAME"
     done
 fi
 
