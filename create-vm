@@ -202,29 +202,12 @@ if [[ "$PORTS" != "none" ]]; then
         done
 
     echo "[+] Setting up iptables forwarding on $EXT_IF"
-    # Ensure global forwarding rules are in place
-    sudo iptables -C FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-        sudo iptables -I FORWARD 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-
-    sudo iptables -t nat -C POSTROUTING -o "$EXT_IF" -j MASQUERADE 2>/dev/null || \
-        sudo iptables -t nat -A POSTROUTING -o "$EXT_IF" -j MASQUERADE
-
     for PORT in "${PORT_ARRAY[@]}"; do
-        sudo iptables -t nat -A PREROUTING \
-          -i "$EXT_IF" -p tcp --dport "$PORT" \
-          -j DNAT --to-destination "$VM_IP:$PORT"
-
-        # Handle traffic generated on the host itself
-        sudo iptables -t nat -A OUTPUT \
-          -p tcp --dport "$PORT" -d 127.0.0.1 -j DNAT --to-destination "$VM_IP:$PORT"
-
-        HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
-        if [[ -n "$HOST_IP" ]]; then
-            sudo iptables -t nat -A OUTPUT \
-              -p tcp --dport "$PORT" -d "$HOST_IP" -j DNAT --to-destination "$VM_IP:$PORT"
-        fi
-
-        # Use -I (Insert) to ensure these rules come before libvirt's default rejects
+        # External access
+        sudo iptables -t nat -A PREROUTING -i "$EXT_IF" -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT"
+        # Host access
+        sudo iptables -t nat -A OUTPUT -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT"
+        # Filter pass-through (using -I to override libvirt defaults)
         sudo iptables -I FORWARD -p tcp -d "$VM_IP" --dport "$PORT" -j ACCEPT
     done
 fi
