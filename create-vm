@@ -215,7 +215,7 @@ if [[ "$PORTS" != "none" ]]; then
         
         # External access: DNAT traffic to the VM
         run_step "[+] Setting up external access for port $PORT" \
-            iptables -t nat -A PREROUTING -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT" -m comment --comment "hikaru-vm-$VM_NAME"
+            iptables -t nat -A PREROUTING -i "$EXT_IF" -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT" -m comment --comment "hikaru-vm-$VM_NAME"
 
         # Host access: When the host itself connects to its own IP or localhost
         HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
