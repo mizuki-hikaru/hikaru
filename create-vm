@@ -224,9 +224,8 @@ if [[ "$PORTS" != "none" ]]; then
               -p tcp --dport "$PORT" -d "$HOST_IP" -j DNAT --to-destination "$VM_IP:$PORT"
         fi
 
-        sudo iptables -A FORWARD \
-          -i "$EXT_IF" -p tcp -d "$VM_IP" --dport "$PORT" \
-          -j ACCEPT
+        # Use -I (Insert) to ensure these rules come before libvirt's default rejects
+        sudo iptables -I FORWARD -p tcp -d "$VM_IP" --dport "$PORT" -j ACCEPT
     done
 fi
 
