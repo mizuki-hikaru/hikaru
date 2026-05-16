@@ -224,11 +224,17 @@ if [[ "$PORTS" != "none" ]]; then
     done
 fi
 
+echo "[+] Setting up DNS"
+# Register DNS entry in the libvirt network
+sudo virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config >/dev/null 2>&1 || true
+
 echo "[+] VM creation complete"
+
 if ! groups "$USER" | grep -qE '\blibvirt\b'; then
     echo "[!] You will need to log out/in for libvirt group membership to apply."
 fi
 echo
+echo "VM Name: $VM_NAME"
 echo "VM IP: $VM_IP"
 echo
 echo "Useful commands:"
