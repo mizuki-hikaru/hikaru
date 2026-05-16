@@ -224,9 +224,7 @@ if [[ "$PORTS" != "none" ]]; then
     done
 fi
 
-echo "[+] Setting up DNS"
-# Register DNS entry in the libvirt network
-sudo virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config >/dev/null 2>&1 || true
+run_step "[+] Setting up DNS" sudo virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config
 
 echo "[+] VM creation complete"
 
