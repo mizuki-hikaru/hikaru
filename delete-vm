@@ -81,20 +81,7 @@ if [[ -n "$VM_IP" ]]; then
             iptables -D FORWARD \"\$RULE_NUM\"
         done
     "
-
-    run_step "[+] Removing DNS entry from libvirt" bash -c "
-        # Get all IPs associated with this hostname to handle potential duplicates/stale records
-        EXISTING_IPS=\$(virsh net-dumpxml default | grep -P \"<hostname>$VM_NAME</hostname>\" -B1 | grep -oP \"ip='\\K[^']+\" || true)
-        if [[ -z \"\$EXISTING_IPS\" ]]; then
-            exit 0
-        fi
-        for IP in \$EXISTING_IPS; do
-            virsh net-update default delete dns-host \"<host ip='\$IP'><hostname>$VM_NAME</hostname></host>\" --live --config 2>/dev/null || true
-        done
-    "
 fi
-
-run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\$/d" /etc/hosts
 
 echo "[+] Destroying VM"
 if sudo virsh domstate "$VM_NAME" | grep -q running; then

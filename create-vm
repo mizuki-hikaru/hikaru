@@ -111,6 +111,9 @@ echo "[+] Preparing cloud-init configuration"
 read -r -d '' TEMPLATE <<'EOF' || true
 #cloud-config
 
+hostname: VM_NAME
+fqdn: VM_NAME.local
+
 users:
   - name: USERNAME
     groups: sudo
@@ -119,6 +122,10 @@ users:
     ssh_authorized_keys:
       - PUBKEY
 
+packages:
+  - avahi-daemon
+  - libnss-mdns
+
 write_files:
   - path: /etc/sudoers.d/90-nopasswd-sudo
     permissions: '0440'
@@ -126,7 +133,8 @@ write_files:
       %sudo ALL=(ALL) NOPASSWD:ALL
 EOF
 
-RESULT="${TEMPLATE//USERNAME/$USERNAME}"
+RESULT="${TEMPLATE//VM_NAME/$VM_NAME}"
+RESULT="${RESULT//USERNAME/$USERNAME}"
 RESULT="${RESULT//PUBKEY/$PUBKEY}"
 
 printf '%s\n' "$RESULT" > "$USER_DATA"
@@ -203,13 +211,6 @@ if [[ "$PORTS" != "none" ]]; then
     done
 fi
 
-run_step "[+] Setting up DNS" virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config
-
-run_step "[+] Updating host /etc/hosts" bash -c "
-    sed -i '/[[:space:]]$VM_NAME\$/d' /etc/hosts
-    echo '$VM_IP $VM_NAME' >> /etc/hosts
-"
-
 echo "[+] VM creation complete"
 
 if ! groups "$USER" | grep -qE '\blibvirt\b'; then
@@ -218,6 +219,7 @@ fi
 echo
 echo "VM Name: $VM_NAME"
 echo "VM IP: $VM_IP"
+echo "mDNS: $VM_NAME.local"
 echo
 echo "Useful commands:"
 echo "  virsh list --all"
