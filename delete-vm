@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- Setup Cleanup and Trap ---
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="${TEMP_DIR}/error.log"
+
+cleanup() {
+    local exit_code=$?
+    if [[ -n "${SUDO_PID:-}" ]]; then
+        kill "$SUDO_PID" 2>/dev/null || true
+    fi
+    rm -rf "$TEMP_DIR"
+    exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+# --- Sudo Management ---
+if ! sudo -n true 2>/dev/null; then
+    echo "[+] Requesting sudo privileges"
+    sudo -v </dev/tty
+    while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+    SUDO_PID=$!
+fi
+
+# --- User Input ---
+while true; do
+    read -rp "VM Name to delete: " VM_NAME </dev/tty
+    if [[ -z "$VM_NAME" ]]; then
+        echo "[-] Name cannot be empty"
+        continue
+    fi
+    if ! sudo virsh dominfo "$VM_NAME" >/dev/null 2>&1; then
+        echo "[-] VM '${VM_NAME}' does not exist."
+        exit 1
+    else
+        break
+    fi
+done
+
+# --- Step Execution Helper ---
+run_step() {
+    local msg="$1"
+    shift
+    echo "$msg"
+    if ! sudo "$@" >"$LOG_FILE" 2>&1; then
+        echo "[-] Failed at step: $msg"
+        echo "--- Error Log ---"
+        cat "$LOG_FILE"
+        exit 1
+    fi
+}
+
+# --- Initial Detection ---
+echo "[+] Detecting VM IP"
+VM_IP=$(sudo virsh domifaddr "$VM_NAME" --source lease 2>/dev/null | awk '/ipv4/ { sub("/.*", "", $4); print $4; exit }')
+
+# Fallback to /etc/hosts if VM is shut down
+if [[ -z "$VM_IP" ]]; then
+    VM_IP=$(grep -P "\s$VM_NAME$" /etc/hosts | awk '{print $1; exit}')
+fi
+
+if [[ -n "$VM_IP" ]]; then
+    echo "[+] Detected VM IP: $VM_IP"
+else
+    echo "[!] Could not detect VM IP. Port forwarding and DNS cleanup might be incomplete."
+fi
+
+# --- Cleanup Steps ---
+if [[ -n "$VM_IP" ]]; then
+    run_step "[+] Removing iptables forwarding rules" bash -c "
+        while true; do
+            RULE_NUM=\$(iptables -t nat -L PREROUTING --line-numbers -n | grep '$VM_IP' | awk '{print \$1; exit}')
+            [[ -z \"\$RULE_NUM\" ]] && break
+            iptables -t nat -D PREROUTING \"\$RULE_NUM\"
+        done
+
+        while true; do
+            RULE_NUM=\$(iptables -L FORWARD --line-numbers -n | grep '$VM_IP' | awk '{print \$1; exit}')
+            [[ -z \"\$RULE_NUM\" ]] && break
+            iptables -D FORWARD \"\$RULE_NUM\"
+        done
+    "
+
+    run_step "[+] Removing DNS entry from libvirt" virsh net-update default delete dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config
+fi
+
+run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\$/d" /etc/hosts
+
+echo "[+] Destroying VM"
+if sudo virsh domstate "$VM_NAME" | grep -q running; then
+    run_step "[+] Stopping VM" virsh destroy "$VM_NAME"
+fi
+run_step "[+] Removing VM and storage" virsh undefine "$VM_NAME" --remove-all-storage
+
+echo "[+] VM '$VM_NAME' successfully deleted."

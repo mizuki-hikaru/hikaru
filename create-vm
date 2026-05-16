@@ -71,7 +71,7 @@ run_step() {
     local msg="$1"
     shift
     echo "$msg"
-    if ! "$@" >"$LOG_FILE" 2>&1; then
+    if ! sudo "$@" >"$LOG_FILE" 2>&1; then
         echo "[-] Failed at step: $msg"
         echo "--- Error Log ---"
         cat "$LOG_FILE"
@@ -91,8 +91,8 @@ echo "$PUBKEY" > "'$TEMP_DIR'/pubkey"
 '
 PUBKEY=$(<"$TEMP_DIR/pubkey")
 
-run_step "[+] Installing packages" sudo apt update
-run_step "[+] Installing dependencies" sudo apt install --no-install-recommends -y \
+run_step "[+] Installing packages" apt update
+run_step "[+] Installing dependencies" apt install --no-install-recommends -y \
   qemu-system-x86 \
   qemu-utils \
   libvirt-daemon-system \
@@ -101,11 +101,11 @@ run_step "[+] Installing dependencies" sudo apt install --no-install-recommends 
   cloud-image-utils \
   wget
 
-run_step "[+] Enabling libvirtd" sudo systemctl enable --now libvirtd
-run_step "[+] Updating group memberships" sudo usermod -aG kvm,libvirt "$USER"
+run_step "[+] Enabling libvirtd" systemctl enable --now libvirtd
+run_step "[+] Updating group memberships" usermod -aG kvm,libvirt "$USER"
 
 if [ ! -f "$BASE_IMG" ]; then
-  run_step "[+] Fetching base image" sudo wget -q -O "$BASE_IMG" "$CLOUD_IMG_URL"
+  run_step "[+] Fetching base image" wget -q -O "$BASE_IMG" "$CLOUD_IMG_URL"
 fi
 
 echo "[+] Preparing cloud-init configuration"
@@ -137,12 +137,12 @@ instance-id: ${VM_NAME}
 local-hostname: ${VM_NAME}
 EOF
 
-run_step "[+] Creating VM disk" sudo qemu-img create -f qcow2 -F qcow2 \
+run_step "[+] Creating VM disk" qemu-img create -f qcow2 -F qcow2 \
   -b "$BASE_IMG" \
   "$VM_DISK" \
   "$VM_DISK_SIZE"
 
-run_step "[+] Installing VM" sudo virt-install \
+run_step "[+] Installing VM" virt-install \
   --name "$VM_NAME" \
   --memory "$VM_RAM_MB" \
   --vcpus "$VM_CPUS" \
@@ -185,31 +185,11 @@ echo "[+] Detected VM IP: $VM_IP"
 EXT_IF=$(ip route | grep default | awk '{print $5; exit}')
 
 if [[ "$PORTS" != "none" ]]; then
-    echo "[+] Cleaning existing iptables rules"
     for PORT in "${PORT_ARRAY[@]}"; do
-        while true; do
-            RULE_NUM=$(
-                sudo iptables -t nat -L PREROUTING --line-numbers -n | \
-                awk "/dpt:$PORT/ && /DNAT/ { print \$1; exit }"
-            )
-
-            [ -z "$RULE_NUM" ] && break
-
-            sudo iptables -t nat -D PREROUTING "$RULE_NUM"
-        done
-    done
-
-    for PORT in "${PORT_ARRAY[@]}"; do
-        while true; do
-            RULE_NUM=$(
-                sudo iptables -L FORWARD --line-numbers -n | \
-                awk "/dpt:$PORT/ && /ACCEPT/ { print \$1; exit }"
-            )
-
-            [ -z "$RULE_NUM" ] && break
-
-            sudo iptables -D FORWARD "$RULE_NUM"
-        done
+        run_step "[+] Clearing conflicts for port $PORT" bash -c "
+            while iptables -t nat -D PREROUTING \$(iptables -t nat -L PREROUTING --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
+            while iptables -D FORWARD \$(iptables -L FORWARD --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
+        "
     done
 
     echo "[+] Setting up iptables forwarding on $EXT_IF"
@@ -224,11 +204,11 @@ if [[ "$PORTS" != "none" ]]; then
     done
 fi
 
-run_step "[+] Setting up DNS" sudo virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config
+run_step "[+] Setting up DNS" virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config
 
 run_step "[+] Updating host /etc/hosts" bash -c "
-    sudo sed -i '/[[:space:]]$VM_NAME\$/d' /etc/hosts
-    echo '$VM_IP $VM_NAME' | sudo tee -a /etc/hosts >/dev/null
+    sed -i '/[[:space:]]$VM_NAME\$/d' /etc/hosts
+    echo '$VM_IP $VM_NAME' >> /etc/hosts
 "
 
 echo "[+] VM creation complete"

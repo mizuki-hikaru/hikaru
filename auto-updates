@@ -28,7 +28,7 @@ run_step() {
     local msg="$1"
     shift
     echo "$msg"
-    if ! "$@" >"$LOG_FILE" 2>&1; then
+    if ! sudo "$@" >"$LOG_FILE" 2>&1; then
         echo "[-] Failed at step: $msg"
         echo "--- Error Log ---"
         cat "$LOG_FILE"
@@ -37,25 +37,25 @@ run_step() {
 }
 
 # --- Steps ---
-run_step "[+] Updating package lists" sudo apt update
-run_step "[+] Installing unattended-upgrades" sudo apt install -y unattended-upgrades apt-listchanges
+run_step "[+] Updating package lists" apt update
+run_step "[+] Installing unattended-upgrades" apt install -y unattended-upgrades apt-listchanges
 
-echo "[+] Configuring periodic upgrades"
-sudo tee /etc/apt/apt.conf.d/22auto-upgrades-local >/dev/null <<'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-APT::Periodic::Download-Upgradeable-Packages "1";
-APT::Periodic::AutocleanInterval "7";
+run_step "[+] Configuring periodic upgrades" bash -c "tee /etc/apt/apt.conf.d/22auto-upgrades-local >/dev/null <<'EOF'
+APT::Periodic::Update-Package-Lists \"1\";
+APT::Periodic::Unattended-Upgrade \"1\";
+APT::Periodic::Download-Upgradeable-Packages \"1\";
+APT::Periodic::AutocleanInterval \"7\";
 EOF
+"
 
-echo "[+] Configuring custom upgrade policies"
-sudo tee /etc/apt/apt.conf.d/52custom-unattended-upgrades >/dev/null <<'EOF'
-Unattended-Upgrade::Remove-Unused-Dependencies "true";
-Unattended-Upgrade::Automatic-Reboot "true";
-Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+run_step "[+] Configuring custom upgrade policies" bash -c "tee /etc/apt/apt.conf.d/52custom-unattended-upgrades >/dev/null <<'EOF'
+Unattended-Upgrade::Remove-Unused-Dependencies \"true\";
+Unattended-Upgrade::Automatic-Reboot \"true\";
+Unattended-Upgrade::Automatic-Reboot-Time \"03:00\";
 EOF
+"
 
-run_step "[+] Enabling unattended-upgrades service" sudo systemctl enable --now unattended-upgrades
+run_step "[+] Enabling unattended-upgrades service" systemctl enable --now unattended-upgrades
 
 echo "[+] Automatic updates enabled"
 echo
