@@ -33,8 +33,11 @@ read -rp "Username [$USER]: " USERNAME </dev/tty
 USERNAME=${USERNAME:-$USER}
 
 while true; do
-    read -rp "VM Name [services]: " VM_NAME </dev/tty
-    VM_NAME=${VM_NAME:-services}
+    read -rp "VM Name: " VM_NAME </dev/tty
+    if [[ -z "$VM_NAME" ]]; then
+        echo "[-] Name cannot be empty"
+        continue
+    fi
     if sudo [ -f "/var/lib/libvirt/images/${VM_NAME}.qcow2" ]; then
         echo "[-] A VM with name '${VM_NAME}' already exists. Please choose a different name."
     else
