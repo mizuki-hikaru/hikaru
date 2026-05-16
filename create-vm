@@ -29,9 +29,6 @@ if ! sudo -n true 2>/dev/null; then
 fi
 
 # --- User Input ---
-read -rp "Username [$USER]: " USERNAME </dev/tty
-USERNAME=${USERNAME:-$USER}
-
 while true; do
     read -rp "VM Name: " VM_NAME </dev/tty
     if [[ -z "$VM_NAME" ]]; then
@@ -44,6 +41,9 @@ while true; do
         break
     fi
 done
+
+read -rp "Username [$USER]: " USERNAME </dev/tty
+USERNAME=${USERNAME:-$USER}
 
 read -rp "RAM (MB) [2048]: " VM_RAM_MB </dev/tty
 VM_RAM_MB=${VM_RAM_MB:-2048}
