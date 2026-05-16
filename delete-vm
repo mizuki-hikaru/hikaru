@@ -83,6 +83,8 @@ if [[ -n "$VM_IP" ]]; then
     "
 fi
 
+run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\$/d" /etc/hosts
+
 echo "[+] Destroying VM"
 if sudo virsh domstate "$VM_NAME" | grep -q running; then
     run_step "[+] Stopping VM" virsh destroy "$VM_NAME"

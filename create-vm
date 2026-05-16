@@ -211,6 +211,11 @@ if [[ "$PORTS" != "none" ]]; then
     done
 fi
 
+run_step "[+] Updating host /etc/hosts" bash -c "
+    sed -i '/[[:space:]]$VM_NAME\$/d' /etc/hosts
+    echo '$VM_IP $VM_NAME' >> /etc/hosts
+"
+
 echo "[+] VM creation complete"
 
 if ! groups "$USER" | grep -qE '\blibvirt\b'; then
