@@ -70,19 +70,19 @@ fi
 if [[ -n "$VM_IP" ]]; then
     run_step "[+] Removing iptables forwarding rules" bash -c "
         while true; do
-            RULE_NUM=\$(iptables -t nat -L PREROUTING --line-numbers -n | grep -F \"$VM_IP\" | awk '{print \$1; exit}')
+            RULE_NUM=\$(iptables -t nat -L PREROUTING --line-numbers -n | grep -Fw \"$VM_IP\" | awk '{print \$1; exit}')
             [[ -z \"\$RULE_NUM\" ]] && break
             iptables -t nat -D PREROUTING \"\$RULE_NUM\"
         done
 
         while true; do
-            RULE_NUM=\$(iptables -t nat -L OUTPUT --line-numbers -n | grep -F \"$VM_IP\" | awk '{print \$1; exit}')
+            RULE_NUM=\$(iptables -t nat -L OUTPUT --line-numbers -n | grep -Fw \"$VM_IP\" | awk '{print \$1; exit}')
             [[ -z \"\$RULE_NUM\" ]] && break
             iptables -t nat -D OUTPUT \"\$RULE_NUM\"
         done
 
         while true; do
-            RULE_NUM=\$(iptables -L FORWARD --line-numbers -n | grep -F \"$VM_IP\" | awk '{print \$1; exit}')
+            RULE_NUM=\$(iptables -L FORWARD --line-numbers -n | grep -Fw \"$VM_IP\" | awk '{print \$1; exit}')
             [[ -z \"\$RULE_NUM\" ]] && break
             iptables -D FORWARD \"\$RULE_NUM\"
         done

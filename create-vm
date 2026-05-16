@@ -195,9 +195,9 @@ EXT_IF=$(ip route | grep default | awk '{print $5; exit}')
 if [[ "$PORTS" != "none" ]]; then
         for PORT in "${PORT_ARRAY[@]}"; do
             run_step "[+] Clearing conflicts for port $PORT" bash -c "
-                while iptables -t nat -D PREROUTING \$(iptables -t nat -L PREROUTING --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
-                while iptables -t nat -D OUTPUT \$(iptables -t nat -L OUTPUT --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
-                while iptables -D FORWARD \$(iptables -L FORWARD --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
+                while iptables -t nat -D PREROUTING \$(iptables -t nat -L PREROUTING --line-numbers -n | awk \"/dpt:\$PORT(\\\\s|\\\$)/ {print \\\$1; exit}\") 2>/dev/null; do :; done
+                while iptables -t nat -D OUTPUT \$(iptables -t nat -L OUTPUT --line-numbers -n | awk \"/dpt:\$PORT(\\\\s|\\\$)/ {print \\\$1; exit}\") 2>/dev/null; do :; done
+                while iptables -D FORWARD \$(iptables -L FORWARD --line-numbers -n | awk \"/dpt:\$PORT(\\\\s|\\\$)/ {print \\\$1; exit}\") 2>/dev/null; do :; done
             "
         done
 
