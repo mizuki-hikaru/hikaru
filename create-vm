@@ -79,6 +79,7 @@ run_step() {
     fi
 }
 
+echo
 echo "[+] Detecting public key"
 if [[ -f "$HOME/.ssh/id_ed25519.pub" ]]; then
     PUBKEY=$(<"$HOME/.ssh/id_ed25519.pub")
