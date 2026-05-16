@@ -226,6 +226,11 @@ fi
 
 run_step "[+] Setting up DNS" sudo virsh net-update default add dns-host "<host ip='$VM_IP'><hostname>$VM_NAME</hostname></host>" --live --config
 
+run_step "[+] Updating host /etc/hosts" bash -c "
+    sudo sed -i '/[[:space:]]$VM_NAME\$/d' /etc/hosts
+    echo '$VM_IP $VM_NAME' | sudo tee -a /etc/hosts >/dev/null
+"
+
 echo "[+] VM creation complete"
 
 if ! groups "$USER" | grep -qE '\blibvirt\b'; then
