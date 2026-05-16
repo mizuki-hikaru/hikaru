@@ -102,6 +102,7 @@ run_step "[+] Installing dependencies" apt install --no-install-recommends -y \
 
 run_step "[+] Enabling libvirtd" systemctl enable --now libvirtd
 run_step "[+] Updating group memberships" usermod -aG kvm,libvirt "$USER"
+run_step "[+] Enabling IP forwarding" sysctl -w net.ipv4.ip_forward=1
 
 if [ ! -f "$BASE_IMG" ]; then
   run_step "[+] Fetching base image" wget -q -O "$BASE_IMG" "$CLOUD_IMG_URL"
@@ -192,18 +193,36 @@ echo "[+] Detected VM IP: $VM_IP"
 EXT_IF=$(ip route | grep default | awk '{print $5; exit}')
 
 if [[ "$PORTS" != "none" ]]; then
-    for PORT in "${PORT_ARRAY[@]}"; do
-        run_step "[+] Clearing conflicts for port $PORT" bash -c "
-            while iptables -t nat -D PREROUTING \$(iptables -t nat -L PREROUTING --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
-            while iptables -D FORWARD \$(iptables -L FORWARD --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
-        "
-    done
+        for PORT in "${PORT_ARRAY[@]}"; do
+            run_step "[+] Clearing conflicts for port $PORT" bash -c "
+                while iptables -t nat -D PREROUTING \$(iptables -t nat -L PREROUTING --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
+                while iptables -t nat -D OUTPUT \$(iptables -t nat -L OUTPUT --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
+                while iptables -D FORWARD \$(iptables -L FORWARD --line-numbers -n | awk '/dpt:$PORT/ {print \$1; exit}') 2>/dev/null; do :; done
+            "
+        done
 
     echo "[+] Setting up iptables forwarding on $EXT_IF"
+    # Ensure global forwarding rules are in place
+    sudo iptables -C FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+        sudo iptables -I FORWARD 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+    sudo iptables -t nat -C POSTROUTING -o "$EXT_IF" -j MASQUERADE 2>/dev/null || \
+        sudo iptables -t nat -A POSTROUTING -o "$EXT_IF" -j MASQUERADE
+
     for PORT in "${PORT_ARRAY[@]}"; do
         sudo iptables -t nat -A PREROUTING \
           -i "$EXT_IF" -p tcp --dport "$PORT" \
           -j DNAT --to-destination "$VM_IP:$PORT"
+
+        # Handle traffic generated on the host itself
+        sudo iptables -t nat -A OUTPUT \
+          -p tcp --dport "$PORT" -d 127.0.0.1 -j DNAT --to-destination "$VM_IP:$PORT"
+
+        HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
+        if [[ -n "$HOST_IP" ]]; then
+            sudo iptables -t nat -A OUTPUT \
+              -p tcp --dport "$PORT" -d "$HOST_IP" -j DNAT --to-destination "$VM_IP:$PORT"
+        fi
 
         sudo iptables -A FORWARD \
           -i "$EXT_IF" -p tcp -d "$VM_IP" --dport "$PORT" \
