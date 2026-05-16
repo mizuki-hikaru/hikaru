@@ -198,15 +198,23 @@ if [[ "$PORTS" != "none" ]]; then
     run_step "[+] Initializing nftables chains" bash -c "
         nft 'add chain ip hikaru prerouting { type nat hook prerouting priority dstnat; }'
         nft 'add chain ip hikaru output { type nat hook output priority -100; }'
-        nft 'add chain ip hikaru forward { type filter hook forward priority filter; }'
+        # Priority -10 ensures we run BEFORE standard libvirt/system rules (priority 0)
+        nft 'add chain ip hikaru postrouting { type nat hook postrouting priority -10; }'
+        nft 'add chain ip hikaru forward { type filter hook forward priority -10; }'
+    "
+
+    run_step "[+] Clearing existing nftables rules for $VM_NAME" bash -c "
+        for chain in prerouting output forward postrouting; do
+            nft -a list chain ip hikaru \$chain 2>/dev/null | grep \"hikaru-vm-$VM_NAME\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru \$chain handle 2>/dev/null || true
+        done
     "
 
     for PORT in "${PORT_ARRAY[@]}"; do
         run_step "[+] Clearing nftables conflicts for port $PORT" bash -c "
             # Delete any existing rules for this port to keep it idempotent
-            nft -a list chain ip hikaru prerouting 2>/dev/null | grep \"dport $PORT\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru prerouting handle 2>/dev/null || true
-            nft -a list chain ip hikaru output 2>/dev/null | grep \"dport $PORT\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru output handle 2>/dev/null || true
-            nft -a list chain ip hikaru forward 2>/dev/null | grep \"dport $PORT\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru forward handle 2>/dev/null || true
+            for chain in prerouting output forward postrouting; do
+                nft -a list chain ip hikaru \$chain 2>/dev/null | grep \"dport $PORT\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru \$chain handle 2>/dev/null || true
+            done
         "
         
         # External access
@@ -222,6 +230,17 @@ if [[ "$PORTS" != "none" ]]; then
         run_step "[+] Setting up forwarding for port $PORT" \
             nft add rule ip hikaru forward ip daddr "$VM_IP" tcp dport "$PORT" accept comment "hikaru-vm-$VM_NAME"
     done
+
+    # Hairpin NAT: Allows VMs to reach each other via the host's external IP
+    # We restrict this to traffic coming from the internal bridge to avoid interfering with direct traffic
+    VM_BRIDGE=$(ip route get "$VM_IP" | grep -Po 'dev \K\S+' | head -n1)
+    if [[ -n "$VM_BRIDGE" ]]; then
+        run_step "[+] Setting up hairpin masquerading" \
+            nft add rule ip hikaru postrouting iifname "$VM_BRIDGE" ip daddr "$VM_IP" masquerade comment "hikaru-vm-$VM_NAME"
+    else
+        run_step "[+] Setting up hairpin masquerading (fallback)" \
+            nft add rule ip hikaru postrouting ip daddr "$VM_IP" masquerade comment "hikaru-vm-$VM_NAME"
+    fi
 fi
 
 run_step "[+] Persisting nftables rules" bash -c "
