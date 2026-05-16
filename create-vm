@@ -224,7 +224,15 @@ if [[ "$PORTS" != "none" ]]; then
     done
 fi
 
-run_step "[+] Persisting nftables rules" bash -c "nft list ruleset > /etc/nftables.conf"
+run_step "[+] Persisting nftables rules" bash -c "
+    # Save only our specific table to a dedicated file
+    nft list table ip hikaru > /etc/nftables.hikaru.conf
+
+    # Ensure our dedicated file is included in the main config
+    if ! grep -q 'include \"/etc/nftables.hikaru.conf\"' /etc/nftables.conf; then
+        echo 'include \"/etc/nftables.hikaru.conf\"' >> /etc/nftables.conf
+    fi
+"
 run_step "[+] Enabling and starting nftables" bash -c "systemctl enable nftables && systemctl start nftables"
 
 run_step "[+] Updating host /etc/hosts" bash -c "

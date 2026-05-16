@@ -73,7 +73,7 @@ run_step "[+] Removing nftables rules for $VM_NAME" bash -c "
     done
 "
 
-run_step "[+] Persisting nftables rules" bash -c "nft list ruleset > /etc/nftables.conf"
+run_step "[+] Persisting nftables rules" bash -c "nft list table ip hikaru > /etc/nftables.hikaru.conf"
 
 run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\(\.local\)\?$/d" /etc/hosts
 
