@@ -235,6 +235,8 @@ run_step "[+] Updating host /etc/hosts" bash -c "
     echo '$VM_IP $VM_NAME' >> /etc/hosts
 "
 
+run_step "[+] Enable automatic starting on boot" virsh autostart $VM_NAME
+
 echo "[+] VM creation complete"
 
 if ! groups "$USER" | grep -qE '\blibvirt\b'; then
