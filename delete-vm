@@ -67,29 +67,15 @@ else
 fi
 
 # --- Cleanup Steps ---
-if [[ -n "$VM_IP" ]]; then
-    run_step "[+] Removing iptables forwarding rules" bash -c "
-        while true; do
-            RULE_NUM=\$(iptables -t nat -L PREROUTING --line-numbers -n | grep -Fw \"$VM_IP\" | awk '{print \$1; exit}')
-            [[ -z \"\$RULE_NUM\" ]] && break
-            iptables -t nat -D PREROUTING \"\$RULE_NUM\"
-        done
+run_step "[+] Removing nftables rules for $VM_NAME" bash -c "
+    for chain in prerouting output forward; do
+        nft -a list chain ip hikaru \$chain 2>/dev/null | grep \"hikaru-vm:$VM_NAME\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru \$chain handle 2>/dev/null || true
+    done
+"
 
-        while true; do
-            RULE_NUM=\$(iptables -t nat -L OUTPUT --line-numbers -n | grep -Fw \"$VM_IP\" | awk '{print \$1; exit}')
-            [[ -z \"\$RULE_NUM\" ]] && break
-            iptables -t nat -D OUTPUT \"\$RULE_NUM\"
-        done
+run_step "[+] Persisting nftables rules" bash -c "nft list ruleset > /etc/nftables.conf"
 
-        while true; do
-            RULE_NUM=\$(iptables -L FORWARD --line-numbers -n | grep -Fw \"$VM_IP\" | awk '{print \$1; exit}')
-            [[ -z \"\$RULE_NUM\" ]] && break
-            iptables -D FORWARD \"\$RULE_NUM\"
-        done
-    "
-fi
-
-run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\$/d" /etc/hosts
+run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\(\.local\)\?$/d" /etc/hosts
 
 echo "[+] Destroying VM"
 if sudo virsh domstate "$VM_NAME" | grep -q running; then
