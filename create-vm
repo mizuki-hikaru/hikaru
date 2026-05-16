@@ -79,17 +79,15 @@ run_step() {
     fi
 }
 
-run_step "[+] Detecting public key" bash -c '
-if [[ -f ~/.ssh/id_ed25519.pub ]]; then
-    PUBKEY=$(<~/.ssh/id_ed25519.pub)
-elif [[ -f ~/.ssh/id_rsa.pub ]]; then
-    PUBKEY=$(<~/.ssh/id_rsa.pub)
+echo "[+] Detecting public key"
+if [[ -f "$HOME/.ssh/id_ed25519.pub" ]]; then
+    PUBKEY=$(<"$HOME/.ssh/id_ed25519.pub")
+elif [[ -f "$HOME/.ssh/id_rsa.pub" ]]; then
+    PUBKEY=$(<"$HOME/.ssh/id_rsa.pub")
 else
+    echo "[-] No SSH public key found in $HOME/.ssh/"
     exit 1
 fi
-echo "$PUBKEY" > "'$TEMP_DIR'/pubkey"
-'
-PUBKEY=$(<"$TEMP_DIR/pubkey")
 
 run_step "[+] Installing packages" apt update
 run_step "[+] Installing dependencies" apt install --no-install-recommends -y \
