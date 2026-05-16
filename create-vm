@@ -99,7 +99,7 @@ run_step "[+] Installing dependencies" apt install --no-install-recommends -y \
   virtinst \
   cloud-image-utils \
   wget \
-  nftables
+  iptables-persistent
 
 run_step "[+] Enabling libvirtd" systemctl enable --now libvirtd
 run_step "[+] Updating group memberships" usermod -aG kvm,libvirt "$USER"
@@ -194,58 +194,43 @@ echo "[+] Detected VM IP: $VM_IP"
 EXT_IF=$(ip route | grep default | awk '{print $5; exit}')
 
 if [[ "$PORTS" != "none" ]]; then
-    run_step "[+] Initializing nftables table" nft add table ip hikaru
-    run_step "[+] Initializing nftables chains" bash -c "
-        nft 'add chain ip hikaru prerouting { type nat hook prerouting priority dstnat; }'
-        nft 'add chain ip hikaru output { type nat hook output priority -100; }'
-        # Priority -10 ensures we run BEFORE standard libvirt/system rules (priority 0)
-        nft 'add chain ip hikaru postrouting { type nat hook postrouting priority -10; }'
-        nft 'add chain ip hikaru forward { type filter hook forward priority -10; }'
-    "
-
-    run_step "[+] Clearing existing nftables rules for $VM_NAME" bash -c "
-        for chain in prerouting output forward postrouting; do
-            nft -a list chain ip hikaru \$chain 2>/dev/null | grep \"hikaru-vm-$VM_NAME\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru \$chain handle 2>/dev/null || true
+    run_step "[+] Clearing existing firewall rules for $VM_NAME" bash -c "
+        # Clear any existing iptables rules for this VM in both nat and filter tables
+        for table in nat filter; do
+            iptables-save -t \$table | grep \"hikaru-vm-$VM_NAME\" | sed 's/^-A/iptables -t '\$table' -D/' | bash || true
         done
     "
 
     for PORT in "${PORT_ARRAY[@]}"; do
-        run_step "[+] Clearing nftables conflicts for port $PORT" bash -c "
+        run_step "[+] Clearing firewall conflicts for port $PORT" bash -c "
             # Delete any existing rules for this port to keep it idempotent
-            for chain in prerouting output forward postrouting; do
-                nft -a list chain ip hikaru \$chain 2>/dev/null | grep \"dport $PORT\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru \$chain handle 2>/dev/null || true
+            for table in nat filter; do
+                iptables-save -t \$table | grep \"dport $PORT\" | grep \"hikaru-vm-\" | sed 's/^-A/iptables -t '\$table' -D/' | bash || true
             done
         "
         
-        # External access: Match any traffic destined for a local host IP on this port
+        # External access: DNAT traffic to the VM
         run_step "[+] Setting up external access for port $PORT" \
-            nft add rule ip hikaru prerouting fib daddr type local tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
+            iptables -t nat -A PREROUTING -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT" -m comment --comment "hikaru-vm-$VM_NAME"
 
         # Host access: When the host itself connects to its own IP or localhost
         HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
-        run_step "[+] Setting up host access for port $PORT" \
-            nft add rule ip hikaru output ip daddr "{ 127.0.0.1, $HOST_IP }" tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
+        run_step "[+] Setting up host access for port $PORT (localhost)" \
+            iptables -t nat -A OUTPUT -d 127.0.0.1 -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT" -m comment --comment "hikaru-vm-$VM_NAME"
+        run_step "[+] Setting up host access for port $PORT (host IP)" \
+            iptables -t nat -A OUTPUT -d "$HOST_IP" -p tcp --dport "$PORT" -j DNAT --to-destination "$VM_IP:$PORT" -m comment --comment "hikaru-vm-$VM_NAME"
 
-        # Forwarding: Ensure the packet is allowed through the filter
+        # Forwarding: Ensure the packet is allowed through the filter (top of chain to override libvirt)
         run_step "[+] Setting up forwarding for port $PORT" \
-            nft add rule ip hikaru forward ip daddr "$VM_IP" tcp dport "$PORT" accept comment "hikaru-vm-$VM_NAME"
+            iptables -I FORWARD -d "$VM_IP" -p tcp --dport "$PORT" -j ACCEPT -m comment --comment "hikaru-vm-$VM_NAME"
 
-        # Double NAT: Masquerade traffic to the VM so the return path and forwarding are guaranteed
+        # Hairpin/Double NAT: Masquerade traffic to the VM so return path is guaranteed
         run_step "[+] Setting up masquerade for port $PORT" \
-            nft add rule ip hikaru postrouting ip daddr "$VM_IP" tcp dport "$PORT" masquerade comment "hikaru-vm-$VM_NAME"
+            iptables -t nat -A POSTROUTING -d "$VM_IP" -p tcp --dport "$PORT" -j MASQUERADE -m comment --comment "hikaru-vm-$VM_NAME"
     done
 fi
 
-run_step "[+] Persisting nftables rules" bash -c "
-    # Save only our specific table to a dedicated file
-    nft list table ip hikaru > /etc/nftables.hikaru.conf
-
-    # Ensure our dedicated file is included in the main config
-    if ! grep -q 'include \"/etc/nftables.hikaru.conf\"' /etc/nftables.conf; then
-        echo 'include \"/etc/nftables.hikaru.conf\"' >> /etc/nftables.conf
-    fi
-"
-run_step "[+] Enabling and starting nftables" bash -c "systemctl enable nftables && systemctl start nftables"
+run_step "[+] Persisting firewall rules" netfilter-persistent save
 
 run_step "[+] Updating host /etc/hosts" bash -c "
     sed -i '/[[:space:]]$VM_NAME\(\.local\)\?$/d' /etc/hosts

@@ -67,13 +67,14 @@ else
 fi
 
 # --- Cleanup Steps ---
-run_step "[+] Removing nftables rules for $VM_NAME" bash -c "
-    for chain in prerouting output forward postrouting; do
-        nft -a list chain ip hikaru \$chain 2>/dev/null | grep \"hikaru-vm-$VM_NAME\" | grep -oP 'handle \K\d+' | xargs -r -n1 nft delete rule ip hikaru \$chain handle 2>/dev/null || true
+run_step "[+] Removing firewall rules for $VM_NAME" bash -c "
+    # Clear any existing iptables rules for this VM in both nat and filter tables
+    for table in nat filter; do
+        iptables-save -t \$table | grep \"hikaru-vm-$VM_NAME\" | sed 's/^-A/iptables -t '\$table' -D/' | bash || true
     done
 "
 
-run_step "[+] Persisting nftables rules" bash -c "nft list table ip hikaru > /etc/nftables.hikaru.conf"
+run_step "[+] Persisting firewall rules" netfilter-persistent save
 
 run_step "[+] Removing entry from host /etc/hosts" sed -i "/[[:space:]]$VM_NAME\(\.local\)\?$/d" /etc/hosts
 
