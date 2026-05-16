@@ -217,30 +217,23 @@ if [[ "$PORTS" != "none" ]]; then
             done
         "
         
-        # External access
+        # External access: Match any traffic destined for a local host IP on this port
         run_step "[+] Setting up external access for port $PORT" \
-            nft add rule ip hikaru prerouting iifname "$EXT_IF" tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
+            nft add rule ip hikaru prerouting fib daddr type local tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
 
-        # Host access
+        # Host access: When the host itself connects to its own IP or localhost
         HOST_IP=$(ip addr show "$EXT_IF" | grep -Po 'inet \K[\d.]+' | head -n1)
         run_step "[+] Setting up host access for port $PORT" \
             nft add rule ip hikaru output ip daddr "{ 127.0.0.1, $HOST_IP }" tcp dport "$PORT" dnat to "$VM_IP:$PORT" comment "hikaru-vm-$VM_NAME"
 
-        # Forwarding
+        # Forwarding: Ensure the packet is allowed through the filter
         run_step "[+] Setting up forwarding for port $PORT" \
             nft add rule ip hikaru forward ip daddr "$VM_IP" tcp dport "$PORT" accept comment "hikaru-vm-$VM_NAME"
-    done
 
-    # Hairpin NAT: Allows VMs to reach each other via the host's external IP
-    # We restrict this to traffic coming from the internal bridge to avoid interfering with direct traffic
-    VM_BRIDGE=$(ip route get "$VM_IP" | grep -Po 'dev \K\S+' | head -n1)
-    if [[ -n "$VM_BRIDGE" ]]; then
-        run_step "[+] Setting up hairpin masquerading" \
-            nft add rule ip hikaru postrouting iifname "$VM_BRIDGE" ip daddr "$VM_IP" masquerade comment "hikaru-vm-$VM_NAME"
-    else
-        run_step "[+] Setting up hairpin masquerading (fallback)" \
-            nft add rule ip hikaru postrouting ip daddr "$VM_IP" masquerade comment "hikaru-vm-$VM_NAME"
-    fi
+        # Double NAT: Masquerade traffic to the VM so the return path and forwarding are guaranteed
+        run_step "[+] Setting up masquerade for port $PORT" \
+            nft add rule ip hikaru postrouting ip daddr "$VM_IP" tcp dport "$PORT" masquerade comment "hikaru-vm-$VM_NAME"
+    done
 fi
 
 run_step "[+] Persisting nftables rules" bash -c "
