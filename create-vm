@@ -91,7 +91,8 @@ else
 fi
 
 run_step "[+] Installing packages" apt update
-run_step "[+] Installing dependencies" apt install --no-install-recommends -y \
+run_step "[+] Pre-configuring iptables-persistent" bash -c "echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections && echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections"
+run_step "[+] Installing dependencies" bash -c "DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
   qemu-system-x86 \
   qemu-utils \
   libvirt-daemon-system \
@@ -99,7 +100,7 @@ run_step "[+] Installing dependencies" apt install --no-install-recommends -y \
   virtinst \
   cloud-image-utils \
   wget \
-  iptables-persistent
+  iptables-persistent"
 
 run_step "[+] Enabling libvirtd" systemctl enable --now libvirtd
 run_step "[+] Updating group memberships" usermod -aG kvm,libvirt "$USER"
